@@ -46,16 +46,29 @@ if [ $? -ne 0 ]; then
     echo "Download failed!"
     exit 1
 fi
-unzip -o ${PACKAGE##*/} 
-
-
-
-
+sudo unzip -o ${PACKAGE##*/} -d /usr/local/bin/
+rm -f snell-server-v4.0.1-linux-amd64.zip
 
 # Create systemd service
-echo -e "[Unit]\nDescription=snell server\n[Service]\nUser=$(whoami)\nWorkingDirectory=$HOME\nExecStart=$HOME/snell-server\nRestart=always\n[Install]\nWantedBy=multi-user.target" | sudo tee /etc/systemd/system/snell.service > /dev/null
-echo "y" | sudo ./snell-server
-sed -i 's/0.0.0.0/127.0.0.1/g' ./snell-server.conf
+echo \
+"[Unit]
+Description=snell server
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/etc/snell
+ExecStart=/usr/local/bin/snell-server
+StandardOutput=syslog
+StandardError=syslog
+SyslogIdentifier=snell
+[Install]
+WantedBy=multi-user.target" | sudo tee /etc/systemd/system/snell.service > /dev/null
+sudo mkdir /etc/snell 
+cd /etc/snell 
+echo "y" | sudo snell-server
+sudo sed -i 's/0.0.0.0/127.0.0.1/g' ./snell-server.conf
 sudo systemctl start snell
 sudo systemctl enable snell
 
@@ -68,7 +81,8 @@ Snell_Port=$(cat snell-server.conf | grep -i listen | cut --delimiter=':' -f2)
 Snell_Psk=$(grep 'psk' snell-server.conf | cut -d= -f2 | tr -d ' ')
 
 # add systemd service 
-echo "[Unit]
+echo \
+"[Unit]
 Description=Shadow-TLS Server Service
 Documentation=man:sstls-server
 After=network-online.target
