@@ -21,7 +21,7 @@ fi
 # Download and install snell
 cd
 ARCH=$(uname -m)
-BASE_URL="https://dl.nssurge.com/snell/snell-server-v4.0.1-linux"
+BASE_URL="https://dl.nssurge.com/snell/snell-server-v5.0.0-linux"
 case $ARCH in
     "x86_64")
         PACKAGE="${BASE_URL}-amd64.zip"
@@ -68,68 +68,15 @@ WantedBy=multi-user.target" | sudo tee /etc/systemd/system/snell.service > /dev/
 sudo mkdir /etc/snell 
 cd /etc/snell 
 echo "y" | sudo snell-server
-sudo sed -i 's/0.0.0.0/127.0.0.1/g' ./snell-server.conf
 sudo systemctl start snell
 sudo systemctl enable snell
 
-# install shadows-tls
-SHADOW_TLS_VERSION=$(curl --silent --max-time 10 "https://api.github.com/repos/ihciah/shadow-tls/releases/latest" | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/')
-
-if [ -z "$SHADOW_TLS_VERSION" ]; then
-    echo "Failed to get Shadow-TLS version from GitHub API"
-    exit 1
-fi
-
-# Determine Shadow-TLS architecture
-case $ARCH in
-    "x86_64")
-        SHADOW_TLS_ARCH="x86_64-unknown-linux-musl"
-        ;;
-    "aarch64")
-        SHADOW_TLS_ARCH="aarch64-unknown-linux-musl"
-        ;;
-    "armv7l")
-        SHADOW_TLS_ARCH="armv7-unknown-linux-musleabihf"
-        ;;
-    *)
-        echo "Unsupported architecture for Shadow-TLS: $ARCH"
-        exit 1
-        ;;
-esac
-
-sudo wget https://github.com/ihciah/shadow-tls/releases/download/$SHADOW_TLS_VERSION/shadow-tls-$SHADOW_TLS_ARCH -O /usr/local/bin/shadow-tls
-
-if [ $? -ne 0 ]; then
-    echo "Shadow-TLS download failed!"
-    exit 1
-fi
-
-sudo chmod +x /usr/local/bin/shadow-tls
 
 Snell_Port=$(cat snell-server.conf | grep -i listen | cut --delimiter=':' -f2)
 Snell_Psk=$(grep 'psk' snell-server.conf | cut -d= -f2 | tr -d ' ')
 
-# add systemd service 
-echo \
-"[Unit]
-Description=Shadow-TLS Server Service
-Documentation=man:sstls-server
-After=network-online.target
-Wants=network-online.target
-
-[Service]
-Type=simple
-ExecStart=/usr/local/bin/shadow-tls --fastopen --v3 server --listen 0.0.0.0:8443 --server 127.0.0.1:$Snell_Port --tls  gateway.icloud.com  --password $Snell_Psk
-StandardOutput=syslog
-StandardError=syslog
-SyslogIdentifier=shadow-tls
-
-[Install]
-WantedBy=multi-user.target"| sudo tee /etc/systemd/system/shadow-tls.service
-sudo systemctl start shadow-tls
-sudo systemctl enable shadow-tls
 
 # print snell server info
 echo
 echo "Copy the following line to Surge, under the [Proxy] section:" 
-echo "$(curl -s ipinfo.io/city) = snell, $(curl -s ipinfo.io/ip), $Snell_Port, psk=$Snell_Psk, version=4, tfo=true,shadow-tls-password=$Snell_Psk, shadow-tls-sni=gateway.icloud.com, shadow-tls-version=3"
+echo "$(curl -s ipinfo.io/city) = snell, $(curl -s ipinfo.io/ip), $Snell_Port, psk=$Snell_Psk, version=5"
