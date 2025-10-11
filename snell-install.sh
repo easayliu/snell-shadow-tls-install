@@ -1,5 +1,9 @@
 #!/bin/bash
 
+# Parse command line arguments for port
+SNELL_PORT=${1:-6160}  # Default port is 6160 if not specified
+
+echo "Installing Snell Server on port $SNELL_PORT..."
 
 # Install dependencies based on the Linux distribution
 if cat /etc/*-release | grep -q -E -i "debian|ubuntu|armbian|deepin|mint"; then
@@ -65,18 +69,31 @@ StandardError=syslog
 SyslogIdentifier=snell
 [Install]
 WantedBy=multi-user.target" | sudo tee /etc/systemd/system/snell.service > /dev/null
-sudo mkdir /etc/snell 
-cd /etc/snell 
-echo "y" | sudo snell-server
+sudo mkdir -p /etc/snell
+cd /etc/snell
+
+# Generate PSK
+SNELL_PSK=$(openssl rand -base64 32 | tr -d '=')
+
+# Create config file with specified port
+sudo tee /etc/snell/snell-server.conf > /dev/null <<EOF
+[snell-server]
+listen = 127.0.0.1:$SNELL_PORT
+psk = $SNELL_PSK
+ipv6 = false
+EOF
+
 sudo systemctl start snell
 sudo systemctl enable snell
 
 
-Snell_Port=$(cat snell-server.conf | grep -i listen | cut --delimiter=':' -f2)
-Snell_Psk=$(grep 'psk' snell-server.conf | cut -d= -f2 | tr -d ' ')
-
-
 # print snell server info
 echo
-echo "Copy the following line to Surge, under the [Proxy] section:" 
-echo "$(curl -s ipinfo.io/city) = snell, $(curl -s ipinfo.io/ip), $Snell_Port, psk=$Snell_Psk, version=5"
+echo "========================================"
+echo "Snell Server Installation Complete!"
+echo "========================================"
+echo "Port: $SNELL_PORT"
+echo "PSK: $SNELL_PSK"
+echo
+echo "Copy the following line to Surge, under the [Proxy] section:"
+echo "$(curl -s --max-time 5 ipinfo.io/city 2>/dev/null || echo 'Server') = snell, $(curl -s --max-time 5 ipinfo.io/ip 2>/dev/null || echo 'YOUR_SERVER_IP'), $SNELL_PORT, psk=$SNELL_PSK, version=5"
