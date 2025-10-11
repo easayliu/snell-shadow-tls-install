@@ -78,7 +78,7 @@ SNELL_PSK=$(openssl rand -base64 32 | tr -d '=')
 # Create config file with specified port
 sudo tee /etc/snell/snell-server.conf > /dev/null <<EOF
 [snell-server]
-listen = 127.0.0.1:$SNELL_PORT
+listen = 0.0.0.0:$SNELL_PORT
 psk = $SNELL_PSK
 ipv6 = false
 EOF
