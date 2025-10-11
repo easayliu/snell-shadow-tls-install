@@ -7,20 +7,20 @@ echo "Installing Snell Server on port $SNELL_PORT..."
 
 # Install dependencies based on the Linux distribution
 if cat /etc/*-release | grep -q -E -i "debian|ubuntu|armbian|deepin|mint"; then
-    sudo apt-get install wget unzip dpkg -y
+    apt-get install wget unzip dpkg -y
 elif cat /etc/*-release | grep -q -E -i "centos|red hat|redhat"; then
-    sudo yum install wget unzip dpkg -y
+    yum install wget unzip dpkg -y
 elif cat /etc/*-release | grep -q -E -i "arch|manjaro"; then
-    sudo pacman -S wget dpkg unzip --noconfirm
+    pacman -S wget dpkg unzip --noconfirm
 elif cat /etc/*-release | grep -q -E -i "fedora"; then
-    sudo dnf install wget unzip dpkg -y
+    dnf install wget unzip dpkg -y
 fi
 
 # Enable BBR
-# echo "net.core.default_qdisc=fq" | sudo tee -a /etc/sysctl.conf
-# echo "net.ipv4.tcp_congestion_control=bbr" | sudo tee -a /etc/sysctl.conf
-# sudo sysctl -p
-# sudo sysctl net.ipv4.tcp_available_congestion_control
+# echo "net.core.default_qdisc=fq" | tee -a /etc/sysctl.conf
+# echo "net.ipv4.tcp_congestion_control=bbr" | tee -a /etc/sysctl.conf
+# sysctl -p
+# sysctl net.ipv4.tcp_available_congestion_control
 
 # Download and install snell
 cd
@@ -50,7 +50,7 @@ if [ $? -ne 0 ]; then
     echo "Download failed!"
     exit 1
 fi
-sudo unzip -o ${PACKAGE##*/} -d /usr/local/bin/
+unzip -o ${PACKAGE##*/} -d /usr/local/bin/
 rm -f ${PACKAGE##*/}
 
 # Create systemd service
@@ -68,23 +68,23 @@ StandardOutput=syslog
 StandardError=syslog
 SyslogIdentifier=snell
 [Install]
-WantedBy=multi-user.target" | sudo tee /etc/systemd/system/snell.service > /dev/null
-sudo mkdir -p /etc/snell
+WantedBy=multi-user.target" | tee /etc/systemd/system/snell.service > /dev/null
+mkdir -p /etc/snell
 cd /etc/snell
 
 # Generate PSK
 SNELL_PSK=$(openssl rand -base64 32 | tr -d '=')
 
 # Create config file with specified port
-sudo tee /etc/snell/snell-server.conf > /dev/null <<EOF
+tee /etc/snell/snell-server.conf > /dev/null <<EOF
 [snell-server]
 listen = 0.0.0.0:$SNELL_PORT
 psk = $SNELL_PSK
 ipv6 = false
 EOF
 
-sudo systemctl start snell
-sudo systemctl enable snell
+systemctl start snell
+systemctl enable snell
 
 
 # print snell server info
