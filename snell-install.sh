@@ -63,7 +63,7 @@ Wants=network-online.target
 [Service]
 Type=simple
 WorkingDirectory=/etc/snell
-ExecStart=/usr/local/bin/snell-server
+ExecStart=/usr/local/bin/snell-server -l info
 StandardOutput=syslog
 StandardError=syslog
 SyslogIdentifier=snell
