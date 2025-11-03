@@ -96,4 +96,4 @@ echo "Port: $SNELL_PORT"
 echo "PSK: $SNELL_PSK"
 echo
 echo "Copy the following line to Surge, under the [Proxy] section:"
-echo "$(curl -s --max-time 5 ipinfo.io/city 2>/dev/null || echo 'Server') = snell, $(curl -s --max-time 5 ipinfo.io/ip 2>/dev/null || echo 'YOUR_SERVER_IP'), $SNELL_PORT, psk=$SNELL_PSK, version=5"
+echo "$(curl -s --max-time 5 ipinfo.io/city 2>/dev/null || echo 'Server') = snell, $(curl -s --max-time 5 ipinfo.io/ip 2>/dev/null || echo 'YOUR_SERVER_IP'), $SNELL_PORT, psk=$SNELL_PSK, reuse=true, version=5"
