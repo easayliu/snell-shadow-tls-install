@@ -1,9 +1,28 @@
-#!/bin/bash
+#!/bin/sh
 #
 # SOCKS5 Proxy Server (microsocks) 一键安装脚本
 # 支持: CentOS 7/8, Ubuntu 18.04+, Debian 10+, Alpine 3.14+
-# 用法: bash install_socks5.sh [端口] [用户名] [密码]
+# 用法: bash install_socks.sh [端口] [用户名] [密码]
+#       Alpine 未装 bash 时可用 sh install_socks.sh ...，脚本会自动安装 bash
 #
+
+# 以下为 POSIX sh 兼容的引导段：非 bash 启动时（如 Alpine 默认的 ash），安装 bash 后重新执行
+if [ -z "${BASH_VERSION:-}" ]; then
+    if [ ! -f "$0" ]; then
+        echo "[ERROR] 请先下载脚本再执行: sh install_socks.sh [端口] [用户名] [密码]"
+        exit 1
+    fi
+    if ! command -v bash >/dev/null 2>&1; then
+        if command -v apk >/dev/null 2>&1; then
+            echo "[INFO] 未检测到 bash，正在通过 apk 安装..."
+            apk add --no-cache bash || { echo "[ERROR] bash 安装失败，请使用 root 运行"; exit 1; }
+        else
+            echo "[ERROR] 此脚本需要 bash，请先安装 bash"
+            exit 1
+        fi
+    fi
+    exec bash "$0" "$@"
+fi
 
 set -euo pipefail
 
@@ -45,9 +64,14 @@ detect_os() {
 }
 
 # 生成随机密码（仅字母数字，避免特殊字符在命令行参数中引发问题）
+# 先用 head 读取定长随机字节再过滤，避免 tr 读无限流时被 SIGPIPE 终止、触发 pipefail 退出
 generate_password() {
     if [[ -z "$SOCKS5_PASS" ]]; then
-        SOCKS5_PASS=$(tr -dc 'A-Za-z0-9' < /dev/urandom | head -c 16)
+        local raw=""
+        while (( ${#raw} < 16 )); do
+            raw+=$(head -c 64 /dev/urandom | LC_ALL=C tr -dc 'A-Za-z0-9')
+        done
+        SOCKS5_PASS=${raw:0:16}
     fi
 }
 
@@ -73,6 +97,7 @@ install_microsocks() {
     case "$OS" in
         ubuntu|debian)
             apt-get update -qq
+            apt-get install -y -qq curl iproute2
             if apt-get install -y -qq microsocks 2>/dev/null; then
                 MICROSOCKS_BIN=$(command -v microsocks)
                 log_info "microsocks 已通过 apt 安装"
@@ -83,11 +108,12 @@ install_microsocks() {
             fi
             ;;
         centos|rhel|rocky|almalinux)
-            yum install -y gcc make curl
+            yum install -y gcc make curl iproute
             install_microsocks_from_source
             ;;
         alpine)
             apk update
+            apk add --no-cache curl iproute2
             if apk add --no-cache microsocks 2>/dev/null; then
                 MICROSOCKS_BIN=$(command -v microsocks)
                 log_info "microsocks 已通过 apk 安装"
@@ -178,7 +204,7 @@ setup_firewall() {
 # 验证服务
 verify() {
     sleep 2
-    if ss -tlnp | grep -q ":${SOCKS5_PORT}"; then
+    if ss -tln | awk '{print $4}' | grep -qE ":${SOCKS5_PORT}\$"; then
         log_info "SOCKS5 代理服务运行正常"
     else
         if [[ "$OS" == "alpine" ]]; then
@@ -193,7 +219,12 @@ verify() {
 # 打印连接信息
 print_info() {
     local server_ip
-    server_ip=$(curl -s4 ifconfig.me 2>/dev/null || hostname -I | awk '{print $1}')
+    server_ip=$(curl -s4 --max-time 5 ifconfig.me 2>/dev/null || true)
+    if [[ -z "$server_ip" ]]; then
+        # 回退到本机出口 IP（BusyBox 的 hostname 不支持 -I，改用 iproute2）
+        server_ip=$(ip -4 route get 1.1.1.1 2>/dev/null \
+            | awk '{for (i = 1; i < NF; i++) if ($i == "src") { print $(i + 1); exit }}' || true)
+    fi
 
     echo ""
     echo "=========================================="
